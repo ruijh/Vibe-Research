@@ -98,12 +98,26 @@ test("Base URL 已经写到完整端点(带 /chat/completions)时不再重复拼
   } finally { await ep.close(); }
 });
 
-test("HTTP 404 的文案指向 Base URL,不再把锅甩给模型名 / 上下文", () => {
+test("Base URL 带大写完整端点时保留大小写且不再重复拼接", async () => {
+  const paths: string[] = [];
+  const ep = await fakeEndpoint((req, res) => {
+    paths.push(req.url ?? "");
+    ok({ choices: [{ message: { role: "assistant", content: "ok" } }] })(req, res);
+  });
+  try {
+    const r = await chatCompletion({ ...baseReq, baseURL: `${ep.baseURL}/Chat/Completions` });
+    assert.equal(r.message.content, "ok");
+    assert.deepEqual(paths, ["/v1/Chat/Completions"]);
+  } finally { await ep.close(); }
+});
+
+test("HTTP 404 的文案提示同时检查 Base URL 和模型名", () => {
   const f = publicApiFailure(new DirectTransportError("http_error", "模型端点返回 404:404 page not found", 404, false),
     "模型名不对、上下文过长，或这个模型不支持工具调用");
   assert.equal(f.code, "api_request_rejected");
   assert.match(f.message, /Base URL/, `404 要指向 Base URL:${f.message}`);
-  assert.ok(!/模型名不对/.test(f.message), `404 不该再提模型名:${f.message}`);
+  assert.match(f.message, /模型名/, `404 要提示检查模型名:${f.message}`);
+  assert.ok(!/上下文过长|不支持工具调用/.test(f.message), `404 不该提示上下文或工具调用问题:${f.message}`);
   // 桌面端会把含 http(s):// 的文案吞成"连接失败" —— 后端自己写的文案不能带 URL
   assert.ok(!/https?:\/\//i.test(f.message), `文案不能带 URL:${f.message}`);
 });

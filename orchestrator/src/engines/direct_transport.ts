@@ -111,9 +111,9 @@ export function publicApiFailure(error: DirectTransportError, rejectedHint: stri
   }
   if (error.status === 429) return { code: "api_rate_limited", message: "模型 API 的调用频率或额度受限，请稍后再试。" };
   if (error.status === 404) {
-    // 404 几乎只有一个原因:地址路径拼错(常见是 Base URL 里多带了 chat/completions 这类端点后缀,产品会再拼一次)。
-    // 这跟"模型名 / 上下文"没关系,别用那句笼统文案把用户引偏;文案里也不放 URL,否则桌面端会把它吞成"连接失败"。
-    return { code: "api_request_rejected", message: "模型 API 说这个地址不存在（HTTP 404）：请到「接入 AI」检查 Base URL —— 多数服务商只填到根地址（到 /v1 为止），不要带「chat/completions」这段路径。" };
+    // 404 可能是路径错,也可能是模型名不存在或未拉取(OpenAI model_not_found、Ollama),需同时提示检查地址和模型名。
+    // 文案不放 URL,否则桌面端会把它吞成"连接失败"。
+    return { code: "api_request_rejected", message: "模型 API 说这个地址或模型不存在（HTTP 404）。请到「接入 AI」检查 Base URL 和模型名是否与服务商文档一致。" };
   }
   if (error.status !== null && error.status >= 400 && error.status < 500) {
     return { code: "api_request_rejected", message: `模型 API 拒绝了这次请求（常见原因：${rejectedHint}）。请到「接入 AI」检查模型与 Base URL 后重试。` };
